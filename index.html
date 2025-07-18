@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Mapa Interactivo con Guardado</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    #map { height: 85vh; }
+    #form-container {
+      padding: 10px;
+      background: #f0f0f0;
+      font-family: sans-serif;
+    }
+    #form-container input {
+      margin: 4px;
+    }
+    .percent-label {
+      width: 40px;
+      height: 40px;
+      background-color: #d7191c;
+      color: white;
+      border-radius: 50% 50% 50% 0;
+      transform: rotate(-45deg);
+      text-align: center;
+      line-height: 40px;
+      font-weight: bold;
+      font-size: 14px;
+      border: 2px solid black;
+      box-shadow: 2px 2px 4px rgba(0,0,0,0.4);
+    }
+    .percent-label div {
+      transform: rotate(45deg);
+    }
+    .address-label {
+      background-color: white;
+      border: 2px solid black;
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 13px;
+      color: black;
+      box-shadow: 3px 3px 5px rgba(0,0,0,0.4);
+      text-align: center;
+      font-weight: bold;
+      max-width: 350px;
+      word-wrap: break-word;
+      display: inline-block;
+    }
+  </style>
+</head>
+<body>
+  <div id="form-container">
+    Dirección: <input type="text" id="dir"> 
+    Latitud: <input type="number" id="lat" step="any"> 
+    Longitud: <input type="number" id="lon" step="any"> 
+    Porcentaje: <input type="text" id="percent"> 
+    <button onclick="addLocation()">Agregar</button>
+    <button onclick="saveLocations()">Guardar</button>
+    <button onclick="loadLocations()">Cargar</button>
+    <button onclick="clearAll()">Borrar Todo</button>
+  </div>
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script>
+    const map = L.map('map').setView([-34.6037, -58.3816], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    const lines = [];
+    const locations = [];
+
+    function createEntry(label, lat, lon, percent, offsetLat=null, offsetLon=null) {
+      locations.push([label, lat, lon, percent]);
+
+      L.marker([lat, lon], {
+        icon: L.divIcon({
+          className: '',
+          html: `<div class='percent-label'><div>${percent}</div></div>`
+        })
+      }).addTo(map);
+
+      if (offsetLat === null) offsetLat = lat + 0.004 * (Math.random() - 0.5);
+      if (offsetLon === null) offsetLon = lon + 0.004 * (Math.random() - 0.5);
+
+      const addressMarker = L.marker([offsetLat, offsetLon], {
+        draggable: true,
+        icon: L.divIcon({
+          className: '',
+          html: `<div class='address-label'>${label}</div>`
+        })
+      }).addTo(map);
+
+      const line = L.polyline([[lat, lon], [offsetLat, offsetLon]], { color: 'black' }).addTo(map);
+      lines.push({ line, addressMarker, fixed: [lat, lon] });
+
+      addressMarker.on('drag', (e) => {
+        line.setLatLngs([ [lat, lon], e.latlng ]);
+      });
+    }
+
+    function addLocation() {
+      const dir = document.getElementById('dir').value;
+      const lat = parseFloat(document.getElementById('lat').value);
+      const lon = parseFloat(document.getElementById('lon').value);
+      const percent = document.getElementById('percent').value;
+      if (!dir || isNaN(lat) || isNaN(lon) || !percent) {
+        alert("Por favor completa todos los campos correctamente.");
+        return;
+      }
+      createEntry(dir, lat, lon, percent);
+    }
+
+    function saveLocations() {
+      localStorage.setItem('mapLocations', JSON.stringify(locations));
+      alert("Ubicaciones guardadas!");
+    }
+
+    function loadLocations() {
+      clearMap();
+      const data = JSON.parse(localStorage.getItem('mapLocations') || '[]');
+      data.forEach(([label, lat, lon, percent]) => {
+        createEntry(label, lat, lon, percent);
+      });
+      alert("Ubicaciones cargadas!");
+    }
+
+    function clearMap() {
+      map.eachLayer((layer) => {
+        if (layer instanceof L.Marker || layer instanceof L.Polyline) {
+          map.removeLayer(layer);
+        }
+      });
+      locations.length = 0;
+      lines.length = 0;
+    }
+
+    function clearAll() {
+      localStorage.removeItem('mapLocations');
+      clearMap();
+      alert("Datos borrados.");
+    }
+
+    window.onload = loadLocations;
+  </script>
+</body>
+</html>
